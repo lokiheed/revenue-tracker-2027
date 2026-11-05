@@ -224,6 +224,8 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
   window.addEventListener("resize",()=>drawChart(targets()));
 
   if(!editing){document.querySelectorAll("input.num").forEach(i=>{i.readOnly=true;i.tabIndex=-1;i.placeholder="";});}
+  // View counting (GoatCounter). Skipped in #edit mode so the owner's edit sessions aren't counted.
+  if(!editing){const gc=document.createElement("script");gc.async=true;gc.src="https://gc.zgo.at/count.js";gc.setAttribute("data-goatcounter","https://lokiheed.goatcounter.com/count");document.head.appendChild(gc);}
   fillInputs();render();
 })();
 </script>
