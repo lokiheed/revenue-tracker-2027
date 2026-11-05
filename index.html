@@ -76,10 +76,20 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .keybox{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:18px;font-size:14px}
 .keybox input{font:inherit;flex:1 1 260px;min-width:0;border:1px solid var(--line);border-radius:4px;padding:7px 9px;background:var(--bg);color:var(--ink)}
 .keybox p{margin:0;flex-basis:100%;color:var(--muted);font-size:13px}
+.lock{max-width:340px;margin:12vh auto 0;padding:28px 24px;background:var(--panel);border:1px solid var(--line);border-radius:8px;text-align:center}
+.lock h1{margin-bottom:6px}
+.lock p{color:var(--muted);margin:0 0 18px;font-size:14px}
+.lock input{font:inherit;font-size:28px;letter-spacing:.5em;text-align:center;width:100%;padding:10px 0 10px .5em;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums}
+.lock input:focus{outline:2px solid var(--focus);outline-offset:1px}
+.lock button{width:100%;margin-top:12px}
+.lock .err{color:var(--under);min-height:1.5em;margin:10px 0 0;font-size:14px}
+.pinrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.keybox .pinrow input{flex:0 0 110px}
 .linkbtn{border:0;background:none;padding:0;color:var(--muted);text-decoration:underline;font-size:13px;cursor:pointer}
 </style>
 </head>
 <body>
+<div class="wrap" id="lockwrap" hidden></div>
 <div class="wrap" id="app"></div>
 <script type="application/json" id="state">{"base":2500000,"janTarget":2500000,"more":[null,null,null,null,null,null,null,null,null,null,null,null],"less":[null,null,null,null,null,null,null,null,null,null,null,null],"updated":null}</script>
 <script id="app-script">
@@ -91,6 +101,8 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
   const editing=location.hash==="#edit";
   const REPO="lokiheed/revenue-tracker-2027", DATA_PATH="data.json", KEY_STORE="rt2027-gh-key";
   let savedJSON=JSON.stringify(saved), saving=false, loading=true, msg="";
+  let pin=null, pendingPin=null, encPayload=null, pinOpen=false;
+  const PIN_STORE="rt2027-pin", ITER=600000;
   const getKey=()=>{try{return localStorage.getItem(KEY_STORE)||"";}catch(e){return "";}};
   const setKey=k=>{try{k?localStorage.setItem(KEY_STORE,k):localStorage.removeItem(KEY_STORE);}catch(e){}};
   window.addEventListener("hashchange",()=>location.reload());
@@ -124,7 +136,7 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
       </div>
       <label class="base">Base target <input class="num" id="base" inputmode="numeric" aria-label="Base monthly target"></label>
     </div>
-    ${editing?`<div class="keybox" id="keybox"></div>`:""}
+    ${editing?`<div class="keybox" id="keybox"></div><div class="keybox" id="pinbox"></div>`:""}
     <div class="chart">
       <div class="legend"><span><i style="background:var(--over)"></i>Billed at or above base</span><span><i style="background:var(--under)"></i>Billed below base</span><span><i style="background:var(--muted);height:2px;vertical-align:3px"></i>Target</span></div>
       <div class="chartwrap"><svg id="chart" role="img" aria-label="Billed amount versus target by month"></svg><div class="tip" id="tip"></div></div>
@@ -172,11 +184,11 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
     if(ni<12){document.getElementById("nextLabel").textContent=`${MONTHS[ni]} target`;document.getElementById("nextVal").textContent=fmt(t[ni])||"—";}
     else{document.getElementById("nextLabel").textContent="January 2028 target";const v=billed(11);document.getElementById("nextVal").textContent=fmt(state.more[11]!=null?b-(v-b):b+(b-v));}
     drawChart(t);
-    const dirty=JSON.stringify(state)!==savedJSON;
+    const dirty=JSON.stringify(state)!==savedJSON||!!pendingPin;
     const st=document.getElementById("status");
     st.classList.toggle("dirty",dirty);
     st.textContent=msg||(loading?"Loading the latest numbers…":saving?"Saving…":dirty?"Unsaved changes":"All changes saved");
-    document.getElementById("save").disabled=!dirty||saving||loading||!getKey();
+    document.getElementById("save").disabled=!dirty||saving||loading||!getKey()||!(pin||pendingPin);
     document.getElementById("discard").disabled=!dirty||saving;
     const u=document.getElementById("updated");
     u.textContent=state.updated?"Last updated "+new Date(state.updated).toLocaleDateString("en-US",{day:"numeric",month:"long",year:"numeric"}):"";
@@ -219,6 +231,77 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
   const api=(path,opt={})=>fetch("https://api.github.com/repos/"+REPO+"/contents/"+path,{...opt,headers:{"Accept":"application/vnd.github+json","Authorization":"Bearer "+getKey(),...(opt.headers||{})}});
   function clean(d){const z=a=>Array.from({length:12},(_,i)=>Array.isArray(a)&&typeof a[i]==="number"?a[i]:null);
     return {base:typeof d.base==="number"?d.base:2500000,janTarget:typeof d.janTarget==="number"?d.janTarget:null,more:z(d.more),less:z(d.less),updated:typeof d.updated==="string"?d.updated:null};}
+  const u8b64=u=>{let s="";for(let i=0;i<u.length;i++)s+=String.fromCharCode(u[i]);return btoa(s);};
+  const b64u8=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+  const isEnc=d=>d&&d.v===1&&typeof d.ct==="string";
+  async function deriveKey(p,salt,iter){const base=await crypto.subtle.importKey("raw",new TextEncoder().encode(p),"PBKDF2",false,["deriveKey"]);
+    return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:iter,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);}
+  async function encryptData(obj,p){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+    const k=await deriveKey(p,salt,ITER);const ct=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},k,new TextEncoder().encode(JSON.stringify(obj))));
+    return {v:1,kdf:"PBKDF2-SHA256",iter:ITER,salt:u8b64(salt),iv:u8b64(iv),ct:u8b64(ct)};}
+  async function decryptData(env,p){const k=await deriveKey(p,b64u8(env.salt),env.iter||ITER);
+    const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64u8(env.iv)},k,b64u8(env.ct));return JSON.parse(new TextDecoder().decode(pt));}
+  function showLock(on){document.getElementById("lockwrap").hidden=!on;app.hidden=on;}
+  function renderLock(){
+    const w=document.getElementById("lockwrap");w.textContent="";
+    const box=document.createElement("div");box.className="lock";
+    const t=document.createElement("h1");t.textContent="2027 Revenue Tracker";
+    const p=document.createElement("p");p.textContent="Enter the 4-digit PIN to view this page.";
+    const i=document.createElement("input");i.type="password";i.inputMode="numeric";i.maxLength=4;i.autocomplete="off";i.setAttribute("aria-label","PIN");
+    const b=document.createElement("button");b.type="button";b.className="primary";b.textContent="Unlock";
+    const e=document.createElement("p");e.className="err";e.setAttribute("role","alert");
+    let busy=false;
+    const go=async()=>{if(busy)return;const v=i.value.trim();if(!/^\d{4}$/.test(v)){e.textContent="Enter all 4 digits.";return;}
+      busy=true;b.disabled=true;b.textContent="Unlocking…";e.textContent="";
+      const ok=await tryUnlock(v);
+      if(!ok){await new Promise(r=>setTimeout(r,600));e.textContent="That PIN isn’t right. Try again.";i.value="";i.focus();}
+      busy=false;b.disabled=false;b.textContent="Unlock";};
+    b.addEventListener("click",go);i.addEventListener("keydown",ev=>{if(ev.key==="Enter")go();});
+    i.addEventListener("input",()=>{i.value=i.value.replace(/\D/g,"").slice(0,4);if(i.value.length===4)go();});
+    box.append(t,p,i,b,e);w.append(box);setTimeout(()=>i.focus(),50);
+  }
+  async function tryUnlock(p){
+    try{const d=await decryptData(encPayload,p);pin=p;try{sessionStorage.setItem(PIN_STORE,p);}catch(e){}
+      applyLoaded(d);showLock(false);renderPinbox();render();return true;}
+    catch(e){return false;}
+  }
+  async function receive(d){
+    if(isEnc(d)){encPayload=d;
+      let sp="";try{sp=sessionStorage.getItem(PIN_STORE)||"";}catch(e){}
+      if(pin&&await tryUnlock(pin))return;
+      if(sp&&sp!==pin&&await tryUnlock(sp))return;
+      pin=null;renderLock();showLock(true);
+    }else{encPayload=null;applyLoaded(d);showLock(false);}
+    renderPinbox();
+  }
+  function renderPinbox(){
+    const pb=document.getElementById("pinbox");if(!pb)return;pb.textContent="";
+    const mk=(tag,props)=>Object.assign(document.createElement(tag),props||{});
+    if(pin&&!pinOpen&&!pendingPin){
+      const s=mk("span",{textContent:"The numbers are locked with a PIN."});
+      const b=mk("button",{type:"button",className:"linkbtn",textContent:"Change PIN"});
+      b.addEventListener("click",()=>{pinOpen=true;renderPinbox();});
+      pb.append(s,b);return;
+    }
+    if(pendingPin&&!pinOpen){
+      const s=mk("span",{textContent:"New PIN is ready. Click Save to lock the numbers with it."});
+      const b=mk("button",{type:"button",className:"linkbtn",textContent:"Undo"});
+      b.addEventListener("click",()=>{pendingPin=null;renderPinbox();render();});
+      pb.append(s,b);return;
+    }
+    const p=mk("p",{textContent:pin?"Choose a new 4-digit PIN. Everyone who views the page will need the new PIN.":"Set a 4-digit PIN. Visitors will need it to see the numbers."});
+    const row=mk("div",{className:"pinrow"});
+    const a=mk("input",{type:"password",inputMode:"numeric",maxLength:4,autocomplete:"new-password",placeholder:"PIN"});a.setAttribute("aria-label","New PIN");
+    const c=mk("input",{type:"password",inputMode:"numeric",maxLength:4,autocomplete:"new-password",placeholder:"Repeat"});c.setAttribute("aria-label","Repeat new PIN");
+    const b=mk("button",{type:"button",className:"primary",textContent:"Use this PIN"});
+    const e=mk("span",{className:"status dirty"});
+    b.addEventListener("click",()=>{if(!/^\d{4}$/.test(a.value)){e.textContent="The PIN must be exactly 4 digits.";return;}
+      if(a.value!==c.value){e.textContent="The two PINs don’t match.";return;}
+      pendingPin=a.value;pinOpen=false;renderPinbox();render();});
+    row.append(a,c,b);
+    if(pin){const x=mk("button",{type:"button",className:"linkbtn",textContent:"Cancel"});x.addEventListener("click",()=>{pinOpen=false;renderPinbox();});row.append(x);}
+    row.append(e);pb.append(p,row);
+  }
   function applyLoaded(d){const c=clean(d);if(JSON.stringify(state)===savedJSON){state=JSON.parse(JSON.stringify(c));}savedJSON=JSON.stringify(c);fillInputs();}
   function explain(status){
     if(status===401)return "GitHub didn’t accept the key. It may be mistyped or expired. Remove it and paste a new one.";
@@ -231,27 +314,29 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
     try{
       if(editing&&getKey()){
         const r=await api(DATA_PATH+"?ref=main&t="+Date.now(),{cache:"no-store"});
-        if(r.ok){const j=await r.json();applyLoaded(JSON.parse(b64dec(j.content)));}
-        else{msg=explain(r.status);const r2=await fetch(DATA_PATH+"?t="+Date.now(),{cache:"no-store"});if(r2.ok)applyLoaded(await r2.json());}
+        if(r.ok){const j=await r.json();await receive(JSON.parse(b64dec(j.content)));}
+        else{msg=explain(r.status);const r2=await fetch(DATA_PATH+"?t="+Date.now(),{cache:"no-store"});if(r2.ok)await receive(await r2.json());}
       }else{
         const r=await fetch(DATA_PATH+"?t="+Date.now(),{cache:"no-store"});
-        if(r.ok)applyLoaded(await r.json());
+        if(r.ok)await receive(await r.json());
       }
     }catch(e){}
     loading=false;render();
   }
   async function save(){
-    if(!getKey()||saving)return;
+    const usePin=pendingPin||pin;
+    if(!getKey()||saving||!usePin)return;
     saving=true;msg="";render();
     const out=JSON.parse(JSON.stringify(state));out.updated=new Date().toISOString();
     try{
       let sha;
       const g=await api(DATA_PATH+"?ref=main&t="+Date.now(),{cache:"no-store"});
       if(g.ok){sha=(await g.json()).sha;}else if(g.status!==404){msg=explain(g.status);saving=false;render();return;}
-      const body={message:"Update revenue numbers",content:b64enc(JSON.stringify(out,null,2)+"\n"),branch:"main"};
+      const env=await encryptData(out,usePin);
+      const body={message:"Update revenue numbers",content:b64enc(JSON.stringify(env,null,2)+"\n"),branch:"main"};
       if(sha)body.sha=sha;
       const p=await api(DATA_PATH,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-      if(p.ok){state=out;savedJSON=JSON.stringify(out);msg="Saved. The public page shows the new numbers within about a minute.";setTimeout(()=>{msg="";render();},8000);}
+      if(p.ok){state=out;savedJSON=JSON.stringify(out);pin=usePin;pendingPin=null;encPayload=env;try{sessionStorage.setItem(PIN_STORE,usePin);}catch(e){}renderPinbox();msg="Saved. The public page shows the new numbers within about a minute.";setTimeout(()=>{msg="";render();},8000);}
       else{msg=explain(p.status);}
     }catch(e){msg="Couldn’t reach GitHub. Check your connection and try again.";}
     saving=false;render();
@@ -273,14 +358,15 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
     }
   }
   document.getElementById("save").addEventListener("click",save);
-  document.getElementById("discard").addEventListener("click",()=>{state=JSON.parse(savedJSON);msg="";fillInputs();render();});
-  window.addEventListener("beforeunload",e=>{if(editing&&JSON.stringify(state)!==savedJSON){e.preventDefault();e.returnValue="";}});
+  document.getElementById("discard").addEventListener("click",()=>{state=JSON.parse(savedJSON);pendingPin=null;pinOpen=false;renderPinbox();msg="";fillInputs();render();});
+  window.addEventListener("beforeunload",e=>{if(editing&&(JSON.stringify(state)!==savedJSON||pendingPin)){e.preventDefault();e.returnValue="";}});
   window.addEventListener("resize",()=>drawChart(targets()));
 
   if(!editing){document.querySelectorAll("input.num").forEach(i=>{i.readOnly=true;i.tabIndex=-1;i.placeholder="";});}
   // View counting (GoatCounter). Skipped in #edit mode so the owner's edit sessions aren't counted.
   if(!editing){const gc=document.createElement("script");gc.async=true;gc.src="https://gc.zgo.at/count.js";gc.setAttribute("data-goatcounter","https://lokiheed.goatcounter.com/count");document.head.appendChild(gc);}
-  fillInputs();renderKeybox();render();load();
+  app.hidden=true;
+  fillInputs();renderKeybox();render();load().then(()=>{if(document.getElementById("lockwrap").hidden)app.hidden=false;});
 })();
 </script>
 </body>
