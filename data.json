@@ -1,33 +1,8 @@
 {
-  "base": 2500000,
-  "janTarget": 2500000,
-  "more": [
-    null,
-    4500000,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null
-  ],
-  "less": [
-    2000000,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null,
-    null
-  ],
-  "updated": "2026-11-05T05:34:41.605Z"
+  "v": 1,
+  "kdf": "PBKDF2-SHA256",
+  "iter": 600000,
+  "salt": "izuCqmsaMSimd60B0Rjlkw==",
+  "iv": "3/ZmCQPw8P++KsaZ",
+  "ct": "xyxwV4xF+a0Jv7bsqwc+kqEStN0584Nqt8ga21F9d9D9wz7lmHotoeW5zPHRr1luxT7mTlPL/EwaofUfwsd580/stVVf573z+6NpiwHwBDqsjQrYqiZXgno5OAw7XHuqeyCsqIOwcuTPiz17gy4NbsyEPee2Vd3/IrD8EwxdwpOiAwYJDrctNuzVMGS9Fh5GVmqjDmHlbMFineJYgR3Eszlel5MyBZNJwtzKSUHcfZ2ylRCnn/JH2qIoza5RMK2NncrTk6308x75fJsyEp7TNYrEy6HAXbYvtizOuv+DyLhU2Zy9CGjEBrc="
 }
