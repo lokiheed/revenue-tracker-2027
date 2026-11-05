@@ -3,7 +3,7 @@
   "janTarget": 2500000,
   "more": [
     null,
-    null,
+    4500000,
     null,
     null,
     null,
@@ -16,7 +16,7 @@
     null
   ],
   "less": [
-    null,
+    2000000,
     null,
     null,
     null,
@@ -29,5 +29,5 @@
     null,
     null
   ],
-  "updated": null
+  "updated": "2026-11-05T05:34:41.605Z"
 }
