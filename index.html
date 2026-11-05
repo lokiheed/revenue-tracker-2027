@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>2027 Revenue Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500&display=swap" rel="stylesheet">
+<style id="app-style">
+:root{
+  --bg:#F7F9FB; --panel:#FFFFFF; --ink:#18232F; --muted:#5B6B7C; --line:#DCE3EA;
+  --over:#0E6E6E; --over-soft:#E2F1F0; --under:#A44A0B; --under-soft:#FBEADC;
+  --input:#1F4FD1; --focus:#1F4FD1; --target-bg:#EEF2F7;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11171E; --panel:#18212B; --ink:#E6ECF2; --muted:#93A3B4; --line:#2A3644;
+    --over:#4FC3B9; --over-soft:#173332; --under:#F0A266; --under-soft:#3A2618;
+    --input:#8FB0FF; --focus:#8FB0FF; --target-bg:#1E2935; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11171E; --panel:#18212B; --ink:#E6ECF2; --muted:#93A3B4; --line:#2A3644;
+  --over:#4FC3B9; --over-soft:#173332; --under:#F0A266; --under-soft:#3A2618;
+  --input:#8FB0FF; --focus:#8FB0FF; --target-bg:#1E2935; color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+[hidden]{display:none!important}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 48px}
+h1{font-family:"IBM Plex Serif",Georgia,"Times New Roman",serif;font-weight:500;font-size:clamp(26px,4vw,34px);line-height:1.15;margin:0 0 6px;letter-spacing:-.01em}
+.lede{color:var(--muted);margin:0 0 24px;max-width:68ch}
+.top{display:flex;flex-wrap:wrap;gap:24px 40px;align-items:flex-end;margin-bottom:22px}
+.next{display:flex;flex-direction:column}
+.next .k{color:var(--muted);font-size:13px}
+.next .v{font-family:"IBM Plex Serif",Georgia,serif;font-size:clamp(30px,5vw,44px);line-height:1.1;font-variant-numeric:tabular-nums}
+.facts{display:flex;flex-wrap:wrap;gap:20px 32px;color:var(--muted);font-size:14px}
+.facts b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.base{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+.chart{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 14px 6px;margin-bottom:18px}
+.chart svg{display:block;width:100%;height:auto}
+.legend{display:flex;gap:18px;font-size:12.5px;color:var(--muted);margin:2px 4px 6px;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.tablebox{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;min-width:1340px;table-layout:fixed;font-variant-numeric:tabular-nums}
+table col.lab{width:124px}
+th,td{padding:0;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+thead th{font-weight:500;font-size:13px;color:var(--muted);padding:10px 10px;background:var(--panel)}
+tbody th{text-align:left;font-weight:600;font-size:14px;padding:10px 14px;position:sticky;left:0;background:var(--panel);z-index:1;min-width:112px}
+tr:last-child th,tr:last-child td{border-bottom:none}
+tr.target td,tr.target th{background:var(--target-bg)}
+td .calc{display:block;padding:10px 10px;font-weight:600}
+input.num{width:100%;min-width:0;border:0;background:transparent;font:inherit;color:var(--input);text-align:right;padding:10px 10px;font-variant-numeric:tabular-nums}
+input.num::placeholder{color:var(--line)}
+input.num[readonly]{color:var(--ink);cursor:default}
+.base input.num[readonly]{border-color:transparent;background:transparent;padding-left:0;text-align:left;width:auto}
+input.num[readonly]:focus{outline:none}
+input.num:focus{outline:2px solid var(--focus);outline-offset:-2px;background:var(--panel)}
+.base input.num{width:130px;min-width:0;border:1px solid var(--line);border-radius:4px;padding:6px 8px;background:var(--panel)}
+td.over{background:var(--over-soft)} td.under{background:var(--under-soft)}
+td.warn input{outline:1px dashed var(--under);outline-offset:-3px}
+.bar{position:sticky;bottom:0;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-top:16px;padding:12px 0}
+.status{font-size:14px;color:var(--muted)}
+.status.dirty{color:var(--under)}
+button{font:inherit;font-weight:500;border-radius:4px;padding:9px 16px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+button.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.note{font-size:13px;color:var(--muted);margin-top:18px;max-width:80ch}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12.5px;padding:6px 8px;border-radius:4px;white-space:nowrap;transform:translate(-50%,-110%);display:none;font-variant-numeric:tabular-nums}
+.chartwrap{position:relative}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script type="application/json" id="state">{"base":2500000,"janTarget":2500000,"more":[null,null,null,null,null,null,null,null,null,null,null,null],"less":[null,null,null,null,null,null,null,null,null,null,null,null],"updated":null}</script>
+<script id="app-script">
+(function(){
+  const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const SHORT=MONTHS.map(m=>m.slice(0,3));
+  let saved=JSON.parse(document.getElementById("state").textContent);
+  let state=JSON.parse(JSON.stringify(saved));
+  const editing=location.hash==="#edit";
+  let savedJSON=JSON.stringify(saved);
+  window.addEventListener("hashchange",()=>location.reload());
+
+  const fmt=n=>n==null||n===""||isNaN(n)?"":Math.round(n).toLocaleString("en-US");
+  const parse=s=>{const t=String(s).replace(/[^0-9.\-]/g,"");if(t===""||t==="-")return null;const n=Number(t);return isNaN(n)?null:n;};
+
+  function targets(){
+    const b=state.base, t=[state.janTarget];
+    for(let i=1;i<12;i++){
+      const m=state.more[i-1], l=state.less[i-1];
+      if(m!=null) t.push(b-(m-b));
+      else if(l!=null) t.push(b+(b-l));
+      else t.push(null);
+    }
+    return t;
+  }
+  function billed(i){return state.more[i]!=null?state.more[i]:state.less[i];}
+
+  const app=document.getElementById("app");
+  app.innerHTML=`
+    <h1>2027 Revenue Tracker</h1>
+    <p class="lede">${editing?"Enter each month’s billed amount in Billed More (at or above the base target) or Billed Less (below it). Next month’s target updates automatically.":"Monthly billing against target for 2027. Each month’s target is adjusted by how much the previous month billed above or below the base target."}</p>
+    <p class="lede" id="updated" style="margin-top:-16px"></p>
+    <div class="top">
+      <div class="next"><span class="k" id="nextLabel">Next target</span><span class="v" id="nextVal">—</span></div>
+      <div class="facts">
+        <span>Billed so far <b id="ytd">—</b></span>
+        <span>Months at or above base <b id="hit">—</b></span>
+        <span>Months below base <b id="miss">—</b></span>
+      </div>
+      <label class="base">Base target <input class="num" id="base" inputmode="numeric" aria-label="Base monthly target"></label>
+    </div>
+    <div class="chart">
+      <div class="legend"><span><i style="background:var(--over)"></i>Billed at or above base</span><span><i style="background:var(--under)"></i>Billed below base</span><span><i style="background:var(--muted);height:2px;vertical-align:3px"></i>Target</span></div>
+      <div class="chartwrap"><svg id="chart" role="img" aria-label="Billed amount versus target by month"></svg><div class="tip" id="tip"></div></div>
+    </div>
+    <div class="tablebox">
+      <table>
+        <colgroup><col class="lab">${MONTHS.map(()=>"<col>").join("")}</colgroup>
+        <thead><tr><th></th>${MONTHS.map(m=>`<th scope="col">${m}</th>`).join("")}</tr></thead>
+        <tbody>
+          <tr class="more"><th scope="row">Billed More</th>${MONTHS.map((m,i)=>`<td data-r="more" data-i="${i}"><input class="num" inputmode="numeric" placeholder="—" aria-label="${m} billed more"></td>`).join("")}</tr>
+          <tr class="target"><th scope="row">Target</th>${MONTHS.map((m,i)=>i===0?`<td><input class="num" id="jan" inputmode="numeric" aria-label="January target"></td>`:`<td><span class="calc" data-t="${i}">—</span></td>`).join("")}</tr>
+          <tr class="less"><th scope="row">Billed Less</th>${MONTHS.map((m,i)=>`<td data-r="less" data-i="${i}"><input class="num" inputmode="numeric" placeholder="—" aria-label="${m} billed less"></td>`).join("")}</tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="bar" ${editing?"":"hidden"}>
+      <span class="status" id="status"></span>
+      <span><button id="discard">Discard changes</button> <button class="primary" id="save">Download updated page</button></span>
+    </div>
+    <p class="note">Rule: if a month bills more than the base, next target = base − (Billed More − base). If it bills less, next target = base + (base − Billed Less). Each month compares against the base target, not the adjusted target. ${editing?"A dashed cell means a number looks like it’s in the wrong row; it still calculates the same way.":""}</p>`;
+
+  const baseIn=document.getElementById("base"), janIn=document.getElementById("jan");
+  function fillInputs(){
+    baseIn.value=fmt(state.base); janIn.value=fmt(state.janTarget);
+    document.querySelectorAll("td[data-r]").forEach(td=>{td.querySelector("input").value=fmt(state[td.dataset.r][+td.dataset.i]);});
+  }
+  function render(){
+    const t=targets(), b=state.base;
+    document.querySelectorAll("[data-t]").forEach(el=>{el.textContent=fmt(t[+el.dataset.t])||"—";});
+    document.querySelectorAll("td[data-r]").forEach(td=>{
+      const r=td.dataset.r,i=+td.dataset.i,v=state[r][i];
+      td.classList.toggle("over",r==="more"&&v!=null);
+      td.classList.toggle("under",r==="less"&&v!=null);
+      const wrong=(r==="more"&&v!=null&&v<b)||(r==="less"&&v!=null&&v>=b)||(r==="less"&&v!=null&&state.more[i]!=null);
+      td.classList.toggle("warn",!!wrong);
+      td.title=r==="less"&&v!=null&&state.more[i]!=null?"Billed More is also filled for this month; Billed More is used.":(wrong?"This amount looks like it belongs in the other row.":"");
+    });
+    let ytd=0,hit=0,miss=0,last=-1;
+    for(let i=0;i<12;i++){const v=billed(i);if(v!=null){ytd+=v;last=i;if(v>=b)hit++;else miss++;}}
+    const filled=last>=0;
+    document.getElementById("ytd").textContent=filled?fmt(ytd):"—";
+    document.getElementById("hit").textContent=filled?hit:"—";
+    document.getElementById("miss").textContent=filled?miss:"—";
+    const ni=last+1;
+    if(ni<12){document.getElementById("nextLabel").textContent=`${MONTHS[ni]} target`;document.getElementById("nextVal").textContent=fmt(t[ni])||"—";}
+    else{document.getElementById("nextLabel").textContent="January 2028 target";const v=billed(11);document.getElementById("nextVal").textContent=fmt(state.more[11]!=null?b-(v-b):b+(b-v));}
+    drawChart(t);
+    const dirty=JSON.stringify(state)!==savedJSON;
+    const st=document.getElementById("status");
+    st.classList.toggle("dirty",dirty);
+    st.textContent=dirty?"Changes not published yet. Download the page, then upload it to your site.":"No changes since this version was published.";
+    document.getElementById("save").disabled=!dirty;
+    document.getElementById("discard").disabled=!dirty;
+    const u=document.getElementById("updated");
+    u.textContent=state.updated?"Last updated "+new Date(state.updated).toLocaleDateString("en-US",{day:"numeric",month:"long",year:"numeric"}):"";
+  }
+
+  function drawChart(t){
+    const svg=document.getElementById("chart"), W=Math.max(320,svg.parentNode.clientWidth||900), H=200, pl=8,pr=8,pt=10,pb=24;
+    const vals=[];for(let i=0;i<12;i++){if(billed(i)!=null)vals.push(billed(i));if(t[i]!=null)vals.push(t[i]);}
+    const max=Math.max(state.base*1.2,...vals,1);
+    const cw=(W-pl-pr)/12, y=v=>pt+(H-pt-pb)*(1-v/max);
+    let s="";
+    const by=y(state.base);
+    s+=`<line x1="${pl}" x2="${W-pr}" y1="${by}" y2="${by}" stroke="var(--line)" stroke-dasharray="3 3"/>`;
+    for(let i=0;i<12;i++){
+      const x=pl+i*cw, v=billed(i), bw=Math.min(cw*0.5,44), bx=x+(cw-bw)/2;
+      if(v!=null){const yy=y(Math.max(v,0));s+=`<rect x="${bx}" y="${yy}" width="${bw}" height="${Math.max(0,H-pb-yy)}" rx="2" fill="var(--${v>=state.base?"over":"under"})"/>`;}
+      if(t[i]!=null){const ty=y(t[i]);s+=`<line x1="${x+cw*0.12}" x2="${x+cw*0.88}" y1="${ty}" y2="${ty}" stroke="var(--ink)" stroke-width="2"/>`;}
+      s+=`<text x="${x+cw/2}" y="${H-6}" text-anchor="middle" font-size="12" fill="var(--muted)" font-family="IBM Plex Sans, Arial, sans-serif">${SHORT[i]}</text>`;
+      s+=`<rect class="hit" data-i="${i}" x="${x}" y="0" width="${cw}" height="${H}" fill="transparent"/>`;
+    }
+    svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("width","100%");svg.innerHTML=s;
+    const tip=document.getElementById("tip");
+    svg.querySelectorAll(".hit").forEach(r=>{
+      r.addEventListener("mouseenter",()=>{const i=+r.dataset.i,v=billed(i);tip.textContent=`${MONTHS[i]}: target ${fmt(t[i])||"—"}, billed ${v!=null?fmt(v):"—"}`;tip.style.display="block";
+        const rect=svg.getBoundingClientRect(),scale=rect.width/W;let left=(pl+i*cw+cw/2)*scale;const half=tip.offsetWidth/2;left=Math.min(Math.max(left,half),rect.width-half);tip.style.left=left+"px";tip.style.top="40px";});
+      r.addEventListener("mouseleave",()=>{tip.style.display="none";});
+    });
+  }
+
+  function bind(input,setter){
+    input.addEventListener("input",()=>{setter(parse(input.value));render();});
+    input.addEventListener("blur",()=>{const v=parse(input.value);input.value=fmt(v);});
+  }
+  bind(baseIn,v=>{state.base=v==null?0:v;});
+  bind(janIn,v=>{state.janTarget=v;});
+  document.querySelectorAll("td[data-r]").forEach(td=>bind(td.querySelector("input"),v=>{state[td.dataset.r][+td.dataset.i]=v;}));
+
+  function pageHTML(s){
+    const json=JSON.stringify(s).replace(/</g,"\\u003c");
+    const css=document.getElementById("app-style").textContent;
+    const js=document.getElementById("app-script").textContent;
+    return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<title>2027 Revenue Tracker</title>\n<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500&display=swap" rel="stylesheet">\n<style id="app-style">${css}</style>\n</head>\n<body>\n<div class="wrap" id="app"></div>\n<script type="application/json" id="state">${json}<\/script>\n<script id="app-script">${js}<\/script>\n</body>\n</html>\n`;
+  }
+
+  document.getElementById("save").addEventListener("click",()=>{
+    const out=JSON.parse(JSON.stringify(state));out.updated=new Date().toISOString();
+    const blob=new Blob([pageHTML(out)],{type:"text/html"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="index.html";
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    state=out;savedJSON=JSON.stringify(out);render();
+  });
+  document.getElementById("discard").addEventListener("click",()=>{state=JSON.parse(savedJSON);fillInputs();render();});
+  window.addEventListener("resize",()=>drawChart(targets()));
+
+  if(!editing){document.querySelectorAll("input.num").forEach(i=>{i.readOnly=true;i.tabIndex=-1;i.placeholder="";});}
+  fillInputs();render();
+})();
+</script>
+</body>
+</html>
