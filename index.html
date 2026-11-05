@@ -73,6 +73,10 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .note{font-size:13px;color:var(--muted);margin-top:18px;max-width:80ch}
 .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);font-size:12.5px;padding:6px 8px;border-radius:4px;white-space:nowrap;transform:translate(-50%,-110%);display:none;font-variant-numeric:tabular-nums}
 .chartwrap{position:relative}
+.keybox{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:18px;font-size:14px}
+.keybox input{font:inherit;flex:1 1 260px;min-width:0;border:1px solid var(--line);border-radius:4px;padding:7px 9px;background:var(--bg);color:var(--ink)}
+.keybox p{margin:0;flex-basis:100%;color:var(--muted);font-size:13px}
+.linkbtn{border:0;background:none;padding:0;color:var(--muted);text-decoration:underline;font-size:13px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -85,7 +89,10 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
   let saved=JSON.parse(document.getElementById("state").textContent);
   let state=JSON.parse(JSON.stringify(saved));
   const editing=location.hash==="#edit";
-  let savedJSON=JSON.stringify(saved);
+  const REPO="lokiheed/revenue-tracker-2027", DATA_PATH="data.json", KEY_STORE="rt2027-gh-key";
+  let savedJSON=JSON.stringify(saved), saving=false, loading=true, msg="";
+  const getKey=()=>{try{return localStorage.getItem(KEY_STORE)||"";}catch(e){return "";}};
+  const setKey=k=>{try{k?localStorage.setItem(KEY_STORE,k):localStorage.removeItem(KEY_STORE);}catch(e){}};
   window.addEventListener("hashchange",()=>location.reload());
 
   const fmt=n=>n==null||n===""||isNaN(n)?"":Math.round(n).toLocaleString("en-US");
@@ -106,7 +113,7 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
   const app=document.getElementById("app");
   app.innerHTML=`
     <h1>2027 Revenue Tracker</h1>
-    <p class="lede">${editing?"Enter each month’s billed amount in Billed More (at or above the base target) or Billed Less (below it). Next month’s target updates automatically.":"Monthly billing against target for 2027. Each month’s target is adjusted by how much the previous month billed above or below the base target."}</p>
+    <p class="lede">${editing?"Enter each month’s billed amount in Billed More (at or above the base target) or Billed Less (below it). Next month’s target updates automatically, and Save publishes the numbers.":"Monthly billing against target for 2027. Each month’s target is adjusted by how much the previous month billed above or below the base target."}</p>
     <p class="lede" id="updated" style="margin-top:-16px"></p>
     <div class="top">
       <div class="next"><span class="k" id="nextLabel">Next target</span><span class="v" id="nextVal">—</span></div>
@@ -117,6 +124,7 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
       </div>
       <label class="base">Base target <input class="num" id="base" inputmode="numeric" aria-label="Base monthly target"></label>
     </div>
+    ${editing?`<div class="keybox" id="keybox"></div>`:""}
     <div class="chart">
       <div class="legend"><span><i style="background:var(--over)"></i>Billed at or above base</span><span><i style="background:var(--under)"></i>Billed below base</span><span><i style="background:var(--muted);height:2px;vertical-align:3px"></i>Target</span></div>
       <div class="chartwrap"><svg id="chart" role="img" aria-label="Billed amount versus target by month"></svg><div class="tip" id="tip"></div></div>
@@ -134,7 +142,7 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
     </div>
     <div class="bar" ${editing?"":"hidden"}>
       <span class="status" id="status"></span>
-      <span><button id="discard">Discard changes</button> <button class="primary" id="save">Download updated page</button></span>
+      <span><button id="discard">Discard changes</button> <button class="primary" id="save">Save</button></span>
     </div>
     <p class="note">Rule: if a month bills more than the base, next target = base − (Billed More − base). If it bills less, next target = base + (base − Billed Less). Each month compares against the base target, not the adjusted target. ${editing?"A dashed cell means a number looks like it’s in the wrong row; it still calculates the same way.":""}</p>`;
 
@@ -167,9 +175,9 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
     const dirty=JSON.stringify(state)!==savedJSON;
     const st=document.getElementById("status");
     st.classList.toggle("dirty",dirty);
-    st.textContent=dirty?"Changes not published yet. Download the page, then upload it to your site.":"No changes since this version was published.";
-    document.getElementById("save").disabled=!dirty;
-    document.getElementById("discard").disabled=!dirty;
+    st.textContent=msg||(loading?"Loading the latest numbers…":saving?"Saving…":dirty?"Unsaved changes":"All changes saved");
+    document.getElementById("save").disabled=!dirty||saving||loading||!getKey();
+    document.getElementById("discard").disabled=!dirty||saving;
     const u=document.getElementById("updated");
     u.textContent=state.updated?"Last updated "+new Date(state.updated).toLocaleDateString("en-US",{day:"numeric",month:"long",year:"numeric"}):"";
   }
@@ -206,27 +214,73 @@ button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
   bind(janIn,v=>{state.janTarget=v;});
   document.querySelectorAll("td[data-r]").forEach(td=>bind(td.querySelector("input"),v=>{state[td.dataset.r][+td.dataset.i]=v;}));
 
-  function pageHTML(s){
-    const json=JSON.stringify(s).replace(/</g,"\\u003c");
-    const css=document.getElementById("app-style").textContent;
-    const js=document.getElementById("app-script").textContent;
-    return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<title>2027 Revenue Tracker</title>\n<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500&display=swap" rel="stylesheet">\n<style id="app-style">${css}</style>\n</head>\n<body>\n<div class="wrap" id="app"></div>\n<script type="application/json" id="state">${json}<\/script>\n<script id="app-script">${js}<\/script>\n</body>\n</html>\n`;
+  const b64enc=str=>{const by=new TextEncoder().encode(str);let bin="";for(let i=0;i<by.length;i+=0x8000)bin+=String.fromCharCode.apply(null,by.subarray(i,i+0x8000));return btoa(bin);};
+  const b64dec=b=>new TextDecoder().decode(Uint8Array.from(atob(b.replace(/\s/g,"")),c=>c.charCodeAt(0)));
+  const api=(path,opt={})=>fetch("https://api.github.com/repos/"+REPO+"/contents/"+path,{...opt,headers:{"Accept":"application/vnd.github+json","Authorization":"Bearer "+getKey(),...(opt.headers||{})}});
+  function clean(d){const z=a=>Array.from({length:12},(_,i)=>Array.isArray(a)&&typeof a[i]==="number"?a[i]:null);
+    return {base:typeof d.base==="number"?d.base:2500000,janTarget:typeof d.janTarget==="number"?d.janTarget:null,more:z(d.more),less:z(d.less),updated:typeof d.updated==="string"?d.updated:null};}
+  function applyLoaded(d){const c=clean(d);if(JSON.stringify(state)===savedJSON){state=JSON.parse(JSON.stringify(c));}savedJSON=JSON.stringify(c);fillInputs();}
+  function explain(status){
+    if(status===401)return "GitHub didn’t accept the key. It may be mistyped or expired. Remove it and paste a new one.";
+    if(status===403||status===404)return "The key can’t write to "+REPO+". Check it has access to this repository with Contents set to Read and write.";
+    if(status===409||status===422)return "The numbers changed on GitHub since this page loaded. Reload the page and enter your changes again.";
+    return "Couldn’t save to GitHub (error "+status+"). Check your connection and try again.";
   }
-
-  document.getElementById("save").addEventListener("click",()=>{
+  async function load(){
+    loading=true;render();
+    try{
+      if(editing&&getKey()){
+        const r=await api(DATA_PATH+"?ref=main&t="+Date.now(),{cache:"no-store"});
+        if(r.ok){const j=await r.json();applyLoaded(JSON.parse(b64dec(j.content)));}
+        else{msg=explain(r.status);const r2=await fetch(DATA_PATH+"?t="+Date.now(),{cache:"no-store"});if(r2.ok)applyLoaded(await r2.json());}
+      }else{
+        const r=await fetch(DATA_PATH+"?t="+Date.now(),{cache:"no-store"});
+        if(r.ok)applyLoaded(await r.json());
+      }
+    }catch(e){}
+    loading=false;render();
+  }
+  async function save(){
+    if(!getKey()||saving)return;
+    saving=true;msg="";render();
     const out=JSON.parse(JSON.stringify(state));out.updated=new Date().toISOString();
-    const blob=new Blob([pageHTML(out)],{type:"text/html"});
-    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="index.html";
-    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
-    state=out;savedJSON=JSON.stringify(out);render();
-  });
-  document.getElementById("discard").addEventListener("click",()=>{state=JSON.parse(savedJSON);fillInputs();render();});
+    try{
+      let sha;
+      const g=await api(DATA_PATH+"?ref=main&t="+Date.now(),{cache:"no-store"});
+      if(g.ok){sha=(await g.json()).sha;}else if(g.status!==404){msg=explain(g.status);saving=false;render();return;}
+      const body={message:"Update revenue numbers",content:b64enc(JSON.stringify(out,null,2)+"\n"),branch:"main"};
+      if(sha)body.sha=sha;
+      const p=await api(DATA_PATH,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      if(p.ok){state=out;savedJSON=JSON.stringify(out);msg="Saved. The public page shows the new numbers within about a minute.";setTimeout(()=>{msg="";render();},8000);}
+      else{msg=explain(p.status);}
+    }catch(e){msg="Couldn’t reach GitHub. Check your connection and try again.";}
+    saving=false;render();
+  }
+  function renderKeybox(){
+    const kb=document.getElementById("keybox");if(!kb)return;
+    kb.textContent="";
+    if(getKey()){
+      const s=document.createElement("span");s.textContent="Saving to GitHub is set up on this browser.";
+      const b=document.createElement("button");b.className="linkbtn";b.type="button";b.textContent="Remove key";
+      b.addEventListener("click",()=>{if(confirm("Remove the GitHub key from this browser? You’ll need to paste it again to save.")){setKey("");msg="";renderKeybox();render();}});
+      kb.append(s,b);
+    }else{
+      const p=document.createElement("p");p.textContent="To save, paste your GitHub key for "+REPO+". It stays in this browser only and is never added to the public page.";
+      const i=document.createElement("input");i.type="password";i.autocomplete="off";i.placeholder="github_pat_…";i.setAttribute("aria-label","GitHub key");
+      const b=document.createElement("button");b.type="button";b.className="primary";b.textContent="Use this key";
+      b.addEventListener("click",()=>{const k=i.value.trim();if(!k)return;setKey(k);msg="";renderKeybox();load();});
+      kb.append(p,i,b);
+    }
+  }
+  document.getElementById("save").addEventListener("click",save);
+  document.getElementById("discard").addEventListener("click",()=>{state=JSON.parse(savedJSON);msg="";fillInputs();render();});
+  window.addEventListener("beforeunload",e=>{if(editing&&JSON.stringify(state)!==savedJSON){e.preventDefault();e.returnValue="";}});
   window.addEventListener("resize",()=>drawChart(targets()));
 
   if(!editing){document.querySelectorAll("input.num").forEach(i=>{i.readOnly=true;i.tabIndex=-1;i.placeholder="";});}
   // View counting (GoatCounter). Skipped in #edit mode so the owner's edit sessions aren't counted.
   if(!editing){const gc=document.createElement("script");gc.async=true;gc.src="https://gc.zgo.at/count.js";gc.setAttribute("data-goatcounter","https://lokiheed.goatcounter.com/count");document.head.appendChild(gc);}
-  fillInputs();render();
+  fillInputs();renderKeybox();render();load();
 })();
 </script>
 </body>
